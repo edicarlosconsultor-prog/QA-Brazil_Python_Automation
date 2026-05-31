@@ -1,33 +1,57 @@
-# helpers.py — Funções auxiliares para os testes do Urban Routes
-
 import json
 import time
-from selenium.common.exceptions import WebDriverException
 
 
 def retrieve_phone_code(driver):
     """Retorna o código de confirmação do telefone.
-    Intercepta requisições feitas ao servidor para obter o código SMS.
-    O pop-up de confirmação do telefone deve estar aberto antes de chamar este método.
+    Usa JavaScript para interceptar respostas XHR/fetch no navegador.
+    Deve ser chamado ANTES de clicar no botão Próximo.
     """
-    code = None
-    for i in range(10):
-        try:
-            logs = [log["message"] for log in driver.get_log('performance') if log.get("message")]
-            for log in reversed(logs):
-                log_data = json.loads(log)
-                body = log_data.get("message", {}).get("params", {}).get("response", {}).get("body")
-                if body:
-                    json_body = json.loads(body)
-                    if "code" in json_body:
-                        code = json_body["code"]
-                        return code
-        except WebDriverException:
-            time.sleep(1)
-            continue
+    # Injeta interceptador de XHR e fetch
+    driver.execute_script("""
+        window._phoneCode = null;
+        var origOpen = XMLHttpRequest.prototype.open;
+        var origSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function() {
+            this._url = arguments[1];
+            origOpen.apply(this, arguments);
+        };
+        XMLHttpRequest.prototype.send = function() {
+            var xhr = this;
+            xhr.addEventListener('load', function() {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data && data.code) {
+                        window._phoneCode = data.code;
+                    }
+                } catch(e) {}
+            });
+            origSend.apply(this, arguments);
+        };
+        var origFetch = window.fetch;
+        window.fetch = function() {
+            return origFetch.apply(this, arguments).then(function(response) {
+                response.clone().json().then(function(data) {
+                    if (data && data.code) {
+                        window._phoneCode = data.code;
+                    }
+                }).catch(function() {});
+                return response;
+            });
+        };
+    """)
+
+
+def get_phone_code(driver):
+    """Recupera o código SMS capturado pelo interceptador JavaScript."""
+    for i in range(20):
+        code = driver.execute_script("return window._phoneCode;")
+        if code:
+            return str(code)
+        time.sleep(1)
     raise Exception(
         "Não foi possível obter o código de confirmação do telefone.\n"
-        "Verifique se o pop-up de confirmação do telefone apareceu e se o código foi enviado."
+        "Verifique se o pop-up de confirmação do telefone apareceu."
     )
 
 

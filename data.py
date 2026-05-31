@@ -1,6 +1,6 @@
 # data.py — Dados de teste para o Urban Routes (Sprint 8)
 
-URBAN_ROUTES_URL = 'https://cnt-7c15fecf-85a0-48bb-a477-892e9cbc8693.containerhub.tripleten-services.com?lng=pt'
+URBAN_ROUTES_URL = 'https://cnt-6e5ea9e8-3ffa-4599-ac79-2c255bf9dd35.containerhub.tripleten-services.com/'
 
 ADDRESS_FROM = 'East 2nd Street, 601'
 ADDRESS_TO = '1300 1st St'
